@@ -114,6 +114,7 @@ func main() {
 			single := scheduleRule.Single
 			double := scheduleRule.Double
 			adjust := scheduleRule.Adjust
+			alarmDescription := "地点: " + location + "\n"
 
 			startTime, endTime := calcClassTime(startWeek, weekday, startClass, endClass, dateBase)
 			_, repeatEndTime := calcClassTime(endWeek, weekday, startClass, endClass, dateBase)
@@ -133,6 +134,11 @@ func main() {
 			event.SetLocation(location)
 			event.SetStartAt(startTime)
 			event.SetEndAt(endTime)
+			alarm := event.AddAlarm()
+			alarm.SetAction(ics.ActionDisplay)
+			alarm.SetSummary(name)
+			alarm.SetTrigger("RELATED=START:-PT15M")
+			alarm.SetDescription(alarmDescription)
 			if single && double { // 单双周都有
 				// RRULE:FREQ=WEEKLY;UNTIL=20170101T000000Z
 				event.AddRrule("FREQ=WEEKLY;UNTIL=" + repeatEndTime.Format("20060102T150405Z"))

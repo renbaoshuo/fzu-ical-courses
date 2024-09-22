@@ -183,7 +183,7 @@ func main() {
 				event.SetSummary(name)
 				event.SetDescription(description)
 				event.SetAllDayStartAt(startTime)
-				event.SetAllDayEndAt(repeatEndTime)
+				event.SetAllDayEndAt(repeatEndTime.AddDate(0, 0, 1))
 
 				continue
 			}
@@ -192,7 +192,6 @@ func main() {
 		}
 	}
 
-	
 	// 写入文件
 	fmt.Println("========")
 	fmt.Println("写入文件", needTerm+".ics")

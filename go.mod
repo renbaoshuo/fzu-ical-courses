@@ -9,7 +9,7 @@ require (
 	github.com/djimenez/iconv-go v0.0.0-20160305225143-8960e66bd3da // indirect
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/west2-online/jwch v0.0.10-0.20240922022501-b879bd481a66 // indirect
+	github.com/west2-online/jwch v0.0.10 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )

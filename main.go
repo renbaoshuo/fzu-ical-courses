@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,8 +15,8 @@ import (
 
 // 作息时间
 var CLASS_TIME = [][2][2]int{
-	{{0, 0}, {0, 0}},  // [[起始小时, 起始分钟], [结束小时, 结束分钟]]
-	{{8, 20}, {9, 5}}, // 1
+	{{0, 0}, {23, 59}}, // [[起始小时, 起始分钟], [结束小时, 结束分钟]]
+	{{8, 20}, {9, 5}},  // 1
 	{{9, 15}, {10, 0}},
 	{{10, 20}, {11, 5}},
 	{{11, 15}, {12, 0}},
@@ -100,6 +101,10 @@ func main() {
 		description := "任课教师：" + teacher + "\n"
 
 		for _, scheduleRule := range course.ScheduleRules {
+			if scheduleRule.FromFullWeek { // 单独处理整周课程
+				continue
+			}
+
 			location := strings.TrimPrefix(scheduleRule.Location, "旗山")
 			startClass := scheduleRule.StartClass
 			endClass := scheduleRule.EndClass
@@ -135,6 +140,50 @@ func main() {
 				// RRULE:FREQ=WEEKLY;UNTIL=20170101T000000Z;INTERVAL=2
 				event.AddRrule("FREQ=WEEKLY;UNTIL=" + repeatEndTime.Format("20060102T150405Z") + ";INTERVAL=2")
 			}
+		}
+
+		// 单独处理整周课程
+		rawScheduleRules := strings.Split(course.RawScheduleRules, "\n")
+
+		for _, rawScheduleRule := range rawScheduleRules {
+			if rawScheduleRule == "" {
+				continue
+			}
+
+			lineData := strings.Fields(rawScheduleRule)
+
+			if strings.Contains(lineData[0], "周") { // 处理整周的课程，比如军训
+				/*
+					03周  星期1  -  04周  星期7
+					[0] 03周
+					[1] 星期1
+					[2] -
+					[3] 04周
+					[4] 星期7
+				*/
+				startWeek, _ := strconv.Atoi(strings.TrimSuffix(lineData[0], "周"))
+				endWeek, _ := strconv.Atoi(strings.TrimSuffix(lineData[3], "周"))
+				startWeekday, _ := strconv.Atoi(strings.TrimPrefix(lineData[1], "星期"))
+				endWeekday, _ := strconv.Atoi(strings.TrimPrefix(lineData[4], "星期"))
+
+				startTime, _ := calcClassTime(startWeek, startWeekday, 0, 0, dateBase)
+				_, repeatEndTime := calcClassTime(endWeek, endWeekday, 0, 0, dateBase)
+
+				eventIdBase := fmt.Sprintf("%s__%s_%s_%d-%d_%d-%d", needTerm, name, teacher, startWeek, endWeek, startWeekday, endWeekday)
+
+				event := cal.AddEvent(md5Str(eventIdBase))
+				event.SetCreatedTime(dateBase)
+				event.SetDtStampTime(time.Now())
+				event.SetModifiedAt(time.Now())
+				event.SetSummary(name)
+				event.SetDescription(description)
+				event.SetAllDayStartAt(startTime)
+				event.SetAllDayEndAt(repeatEndTime)
+
+				continue
+			}
+
+			// 其他课程不管
 		}
 	}
 

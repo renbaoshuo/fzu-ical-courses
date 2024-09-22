@@ -49,10 +49,13 @@ func main() {
 	err := stu.Login()
 	solveErr(err)
 
+	fmt.Println("登录成功！")
+
 	// 获取学期列表
 	terms, err := stu.GetTerms()
 	solveErr(err)
 
+	fmt.Println("========")
 	fmt.Println("学期列表:", strings.Join(terms.Terms, " "))
 
 	var needTerm string
@@ -89,6 +92,8 @@ func main() {
 	// 获取课程表
 	list, err := stu.GetSemesterCourses(needTerm, terms.ViewState, terms.EventValidation)
 	solveErr(err)
+
+	fmt.Printf("找到 %d 门课程\n", len(list))
 
 	// 转换为 ics 格式
 	cal := ics.NewCalendar()
@@ -193,10 +198,17 @@ func main() {
 		}
 	}
 
+	
 	// 写入文件
+	fmt.Println("========")
+	fmt.Println("写入文件", needTerm+".ics")
+
 	calendarContent := cal.Serialize()
 	err = os.WriteFile(needTerm+".ics", []byte(calendarContent), 0644)
 	solveErr(err)
+
+	fmt.Println("写入成功！")
+	fmt.Println("========")
 }
 
 func calcClassTime(week int, weekday int, startClass int, endClass int, dateBase time.Time) (time.Time, time.Time) {

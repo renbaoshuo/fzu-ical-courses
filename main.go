@@ -59,9 +59,12 @@ func main() {
 	fmt.Println("学期列表:", strings.Join(terms.Terms, " "))
 
 	var needTerm string
-	fmt.Print("请输入学期: ")
+	fmt.Print("请输入学期 (all): ")
 	fmt.Scan(&needTerm)
-	if !contains(terms.Terms, needTerm) {
+
+	if needTerm == "" || needTerm == "all" {
+		needTerm = "all"
+	} else if !contains(terms.Terms, needTerm) {
 		fmt.Println("无效学期！")
 		return
 	}
@@ -70,18 +73,47 @@ func main() {
 	calendar, err := stu.GetSchoolCalendar()
 	solveErr(err)
 
+	// 转换为 ics 格式
+	cal := ics.NewCalendar()
+	cal.SetMethod(ics.MethodRequest)
+	cal.SetXWRCalName(fmt.Sprintf("福州大学课程表 [%s]", id))
+	cal.SetTimezoneId("Asia/Shanghai")
+	cal.SetXWRTimezone("Asia/Shanghai")
+
+	if needTerm == "all" {
+		for _, term := range terms.Terms {
+			addTermToCalendar(stu, cal, calendar, term, terms.ViewState, terms.EventValidation)
+		}
+	} else {
+		addTermToCalendar(stu, cal, calendar, needTerm, terms.ViewState, terms.EventValidation)
+	}
+
+	// 写入文件
+	fmt.Println("========")
+	fmt.Println("写入文件", needTerm+".ics")
+
+	calendarContent := cal.Serialize()
+	err = os.WriteFile(needTerm+".ics", []byte(calendarContent), 0644)
+	solveErr(err)
+
+	fmt.Println("写入成功！")
+	fmt.Println("========")
+}
+
+func addTermToCalendar(stu *jwch.Student, cal *ics.Calendar, schoolCal *jwch.SchoolCalendar, term string, viewState string, eventValidation string) {
 	var curTermStartDate time.Time
+	var err error
 
 	// 查找学期开始时间
-	for _, item := range calendar.Terms {
-		if item.Term == needTerm {
+	for _, item := range schoolCal.Terms {
+		if item.Term == term {
 			curTermStartDate, err = time.Parse("2006-01-02", item.StartDate)
 			solveErr(err)
 		}
 	}
 
 	if curTermStartDate.IsZero() {
-		fmt.Println("未找到学期开始时间！")
+		fmt.Printf("未找到学期 [%s] 开始时间！\n", term)
 		return
 	}
 
@@ -90,17 +122,16 @@ func main() {
 	dateBase := curTermStartDate
 
 	// 获取课程表
-	list, err := stu.GetSemesterCourses(needTerm, terms.ViewState, terms.EventValidation)
+	list, err := stu.GetSemesterCourses(term, viewState, eventValidation)
 	solveErr(err)
 
-	fmt.Printf("找到 %d 门课程\n", len(list))
+	fmt.Printf("[%s] 找到 %d 门课程\n", term, len(list))
 
-	// 转换为 ics 格式
-	cal := ics.NewCalendar()
-	cal.SetMethod(ics.MethodRequest)
-	cal.SetTimezoneId("Asia/Shanghai")
+	addCoursesToCalendar(cal, term, list, dateBase)
+}
 
-	for _, course := range list {
+func addCoursesToCalendar(cal *ics.Calendar, term string, courses []*jwch.Course, dateBase time.Time) {
+	for _, course := range courses {
 		name := course.Name
 		teacher := course.Teacher
 		description := "任课教师：" + teacher + "\n"
@@ -122,7 +153,7 @@ func main() {
 
 			startTime, endTime := calcClassTime(startWeek, weekday, startClass, endClass, dateBase)
 			_, repeatEndTime := calcClassTime(endWeek, weekday, startClass, endClass, dateBase)
-			eventIdBase := fmt.Sprintf("%s__%s_%s_%d-%d_%d_%d-%d_%s_%t_%t", needTerm, name, teacher, startWeek, endWeek, weekday, startClass, endClass, location, single, double)
+			eventIdBase := fmt.Sprintf("%s__%s_%s_%d-%d_%d_%d-%d_%s_%t_%t", term, name, teacher, startWeek, endWeek, weekday, startClass, endClass, location, single, double)
 
 			if adjust {
 				name = "[调课] " + name
@@ -174,7 +205,7 @@ func main() {
 				startTime, _ := calcClassTime(startWeek, startWeekday, 0, 0, dateBase)
 				_, repeatEndTime := calcClassTime(endWeek, endWeekday, 0, 0, dateBase)
 
-				eventIdBase := fmt.Sprintf("%s__%s_%s_%d-%d_%d-%d", needTerm, name, teacher, startWeek, endWeek, startWeekday, endWeekday)
+				eventIdBase := fmt.Sprintf("%s__%s_%s_%d-%d_%d-%d", term, name, teacher, startWeek, endWeek, startWeekday, endWeekday)
 
 				event := cal.AddEvent(md5Str(eventIdBase))
 				event.SetCreatedTime(dateBase)
@@ -191,17 +222,6 @@ func main() {
 			// 其他课程不管
 		}
 	}
-
-	// 写入文件
-	fmt.Println("========")
-	fmt.Println("写入文件", needTerm+".ics")
-
-	calendarContent := cal.Serialize()
-	err = os.WriteFile(needTerm+".ics", []byte(calendarContent), 0644)
-	solveErr(err)
-
-	fmt.Println("写入成功！")
-	fmt.Println("========")
 }
 
 func calcClassTime(week int, weekday int, startClass int, endClass int, dateBase time.Time) (time.Time, time.Time) {
